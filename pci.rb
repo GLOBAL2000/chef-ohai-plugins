@@ -16,10 +16,10 @@ def standard_form( tag, line )
 end
 
 def standard_array( tag, line )
-  if !$devices[$d_id]["#{tag}"].kind_of?(Array) 
-    $devices[$d_id]["#{tag}"] = [ line ]
+  if !$devices[$d_id][tag].kind_of?(Array) 
+    $devices[$d_id][tag] = [ line ]
   else
-    $devices[$d_id]["#{tag}"].push( line )
+    $devices[$d_id][tag].push( line )
   end
 end
 
@@ -32,7 +32,7 @@ lspci.split("\n").each do |line|
       $d_id = tmp # From now on we will need this id
       $devices[$d_id] = Mash.new
     else
-	standard_form( "device", dev[1])
+      standard_form( "device", dev[1])
     end
   when "Class"
     standard_form( "class", dev[1])
