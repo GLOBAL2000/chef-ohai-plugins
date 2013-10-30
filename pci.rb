@@ -42,6 +42,8 @@ lspci.split("\n").each do |line|
     standard_array( "driver", dev[1])
   when "Module"
     standard_array( "module", dev[1])
+  when "SDevice"
+    standard_form("sdevice", dev[1])
   else
   end
 end
