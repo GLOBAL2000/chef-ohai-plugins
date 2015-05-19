@@ -13,52 +13,62 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-provides "pci"
+Ohai.plugin(:Lspci) do
+  depends 'platform'
+  provides 'pci'
 
-$devices = Mash.new
-lspci = `lspci -vnnmk`
+  require 'mixlib/shellout'
 
-$h = /[0-9a-fA-F]/ #any hex digit
-$hh = /#{$h}#{$h}/ #any 2 hex digits
-$hhhh = /#{$h}#{$h}#{$h}#{$h}/ #any 4 hex digits
+  collect_data(:linux) do
+    $devices = Mash.new
+    lspci = Mixlib::ShellOut.new('lspci -vnnmk').run_command
 
-$d_id = String.new #This identifies our pci devices
+    $h = /[0-9a-fA-F]/ #any hex digit
+    $hh = /#{$h}#{$h}/ #any 2 hex digits
+    $hhhh = /#{$h}#{$h}#{$h}#{$h}/ #any 4 hex digits
 
-def standard_form( tag, line )
-  tmp = line.scan(/(.*)\s\[(#{$hhhh})\]/)[0]
-  $devices[$d_id]["#{tag}_name"] = tmp[0]
-  $devices[$d_id]["#{tag}_id"] = tmp[1]
-end
+    $d_id = String.new #This identifies our pci devices
 
-def standard_array( tag, line )
-  if !$devices[$d_id][tag].kind_of?(Array) 
-    $devices[$d_id][tag] = [ line ]
-  else
-    $devices[$d_id][tag].push( line )
-  end
-end
-
-lspci.split("\n").each do |line|
-  dev = line.scan(/^(.*):\s(.*)$/)[0]
-  next if dev.nil?
-  case dev[0]
-  when "Device" # There are two different Device tags
-    if tmp = dev[1].match(/(#{$hh}:#{$hh}.#{$h})/) then #We have a device id
-      $d_id = tmp # From now on we will need this id
-      $devices[$d_id] = Mash.new
-    else
-      standard_form( "device", dev[1])
+    def standard_form(tag, line)
+      tmp = line.scan(/(.*)\s\[(#{$hhhh})\]/)[0]
+      $devices[$d_id]["#{tag}_name"] = tmp[0]
+      $devices[$d_id]["#{tag}_id"] = tmp[1]
     end
-  when "Class"
-    standard_form( "class", dev[1])
-  when "Vendor"
-    standard_form( "vendor", dev[1])
-  when "Driver"
-    standard_array( "driver", dev[1])
-  when "Module"
-    standard_array( "module", dev[1])
-  else
+
+    def standard_array(tag, line)
+      if !$devices[$d_id][tag].kind_of?(Array)
+        $devices[$d_id][tag] = [line]
+      else
+        $devices[$d_id][tag].push(line)
+      end
+    end
+
+    lspci.stdout.split("\n").each do |line|
+      dev = line.scan(/^(.*):\s(.*)$/)[0]
+      next if dev.nil?
+      case dev[0]
+      when "Device" # There are two different Device tags
+        if tmp = dev[1].match(/(#{$hh}:#{$hh}.#{$h})/)
+          # We have a device id
+          $d_id = tmp[0] # From now on we will need this id
+          $devices[$d_id] = Mash.new
+        else
+          standard_form("device", dev[1])
+        end
+      when "Class"
+        standard_form("class", dev[1])
+      when "Vendor"
+        standard_form("vendor", dev[1])
+      when "Driver"
+        standard_array("driver", dev[1])
+      when "Module"
+        standard_array("module", dev[1])
+      when "SDevice"
+        standard_form("sdevice", dev[1])
+      else
+      end
+    end
+
+    pci $devices
   end
 end
-
-pci $devices
